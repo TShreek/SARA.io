@@ -1,3 +1,6 @@
+
+# dont forget to install dependencies, ask chatgpt for help if u want
+from flask import Flask, request, jsonify
 import requests
 import openai
 from dotenv import load_dotenv
@@ -5,7 +8,6 @@ from PyPDF2 import PdfReader
 from pytesseract import image_to_string
 from PIL import Image
 import os
-# dont forget to install dependencies, ask chatgpt for help if u want
 
 # Load environment variables from .env file
 load_dotenv()
@@ -118,17 +120,23 @@ def simplify():
 
 @app.route('/extract_text', methods=['POST'])
 def extract_text():
-    data = request.get_json()
-    file_type = data.get('file_type')
-    file_path = data.get('file_path')
-
+    file = request.files.get('file')
+    file_type = request.form.get('file_type')
+    
+    if not file:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file_path = os.path.join("uploads", file.filename)
+    file.save(file_path)
+    
     if file_type == "pdf":
         text = extract_text_from_pdf(file_path)
     elif file_type == "image":
         text = extract_text_from_image(file_path)
     else:
         return jsonify({'error': 'Invalid file type'}), 400
-
+    
+    os.remove(file_path)  # Clean up the file after processing
     return jsonify({'extracted_text': text})
 
 @app.route('/search_articles', methods=['POST'])
@@ -161,4 +169,5 @@ def calculate_video_relevance():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
