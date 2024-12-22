@@ -403,5 +403,87 @@ function showVideos(videos) {
         resultsSection.appendChild(videoCard);
     });
 }
+// Handle file input
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function() {
+            const content = reader.result;
+            analyzeContent(content);
+        };
+        reader.readAsText(file);
+    }
+}
+
+// Handle text input
+function processText() {
+    const text = document.getElementById('studyText').value;
+    if (text) {
+        analyzeContent(text);
+    }
+}
+
+// Analyze content and send it to the backend
+function analyzeContent(content) {
+    document.getElementById('loading').style.display = 'block';
+
+    fetch('/analyze-content', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: content })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        displayResults(data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('loading').style.display = 'none';
+    });
+}
+
+// Display results
+function displayResults(data) {
+    const resultsSection = document.getElementById('results');
+    resultsSection.innerHTML = '';
+
+    // Display simplified text
+    const simplifiedText = document.createElement('div');
+    simplifiedText.classList.add('simplified-text');
+    simplifiedText.innerHTML = `<h3>Simplified Explanation:</h3><p>${data.simplified_text}</p>`;
+    resultsSection.appendChild(simplifiedText);
+
+    // Display articles
+    const articlesSection = document.createElement('div');
+    articlesSection.classList.add('articles');
+    articlesSection.innerHTML = '<h3>Related Articles:</h3>';
+    data.articles.forEach(article => {
+        const articleItem = document.createElement('div');
+        articleItem.innerHTML = `<a href="${article.link}" target="_blank">${article.title}</a><p>${article.snippet}</p>`;
+        articlesSection.appendChild(articleItem);
+    });
+    resultsSection.appendChild(articlesSection);
+
+    // Display YouTube videos
+    const videosSection = document.createElement('div');
+    videosSection.classList.add('videos');
+    videosSection.innerHTML = '<h3>Related YouTube Videos:</h3>';
+    data.videos.forEach(video => {
+        const videoCard = document.createElement('div');
+        videoCard.classList.add('video-card');
+        videoCard.innerHTML = `
+            <a href="${video.link}" target="_blank">
+                <img src="${video.thumbnail}" alt="${video.title}" class="video-thumbnail">
+                <h4>${video.title}</h4>
+                <p>${video.description}</p>
+            </a>`;
+        videosSection.appendChild(videoCard);
+    });
+    resultsSection.appendChild(videosSection);
+}
 </script>
 </html>
