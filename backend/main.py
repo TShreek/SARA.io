@@ -19,25 +19,19 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 # Set up OpenAI API
 openai.api_key = OPENAI_API_KEY
 
+app = Flask(__name__)
+
 def simplify_content(raw_text):
-    """
-    Simplify a given text using OpenAI's GPT API.
-    """
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[
-                {"role": "user", "content": f"Explain this concept in simple terms: {raw_text}"}
-            ]
+            messages=[{"role": "user", "content": f"Explain this concept in simple terms: {raw_text}"}]
         )
         return response.choices[0].message['content']
     except Exception as e:
         return f"Error simplifying content: {e}"
 
 def extract_text_from_pdf(pdf_path):
-    """
-    Extract text from a PDF file.
-    """
     try:
         reader = PdfReader(pdf_path)
         text = ""
@@ -48,9 +42,6 @@ def extract_text_from_pdf(pdf_path):
         return f"Error extracting text from PDF: {e}"
 
 def extract_text_from_image(image_path):
-    """
-    Extract text from an image file using Tesseract OCR.
-    """
     try:
         text = image_to_string(Image.open(image_path))
         return text
@@ -58,9 +49,6 @@ def extract_text_from_image(image_path):
         return f"Error extracting text from image: {e}"
 
 def search_articles(query):
-    """
-    Search for articles using the Google Custom Search API.
-    """
     try:
         url = f"https://www.googleapis.com/customsearch/v1"
         params = {
@@ -71,7 +59,6 @@ def search_articles(query):
         response = requests.get(url, params=params)
         data = response.json()
 
-        # Extract article titles, links, and descriptions
         results = []
         for item in data.get("items", []):
             title = item.get("title")
@@ -84,9 +71,6 @@ def search_articles(query):
         return f"Error fetching articles: {e}"
 
 def search_youtube_videos(query):
-    """
-    Search for relevant YouTube videos using the YouTube Data API.
-    """
     try:
         url = f"https://www.googleapis.com/youtube/v3/search"
         params = {
@@ -99,7 +83,6 @@ def search_youtube_videos(query):
         response = requests.get(url, params=params)
         data = response.json()
 
-        # Extract video titles and links
         results = []
         for item in data.get("items", []):
             title = item["snippet"]["title"]
@@ -113,64 +96,69 @@ def search_youtube_videos(query):
         return f"Error fetching YouTube videos: {e}"
 
 def calculate_relevance(topic, text):
-    """
-    Calculate relevance of a YouTube video to the topic using OpenAI's GPT API.
-    """
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[
-                {"role": "user", "content": f"How relevant is this text to the topic '{topic}'? Rate it on a scale of 0 to 10: {text}"}
-            ]
+            messages=[{"role": "user", "content": f"How relevant is this text to the topic '{topic}'? Rate it on a scale of 0 to 10: {text}"}]
         )
         return response.choices[0].message['content']
     except Exception as e:
         return f"Error calculating relevance: {e}"
 
-def main():
-    print("Welcome to the Advanced Topic Simplifier!")
-    choice = input("Enter '1' for text, '2' for PDF, '3' for image: ")
+# API endpoints
 
-    raw_text = ""
-    if choice == "1":
-        topic = input("Enter your topic: ")
-        raw_text = topic
-    elif choice == "2":
-        pdf_path = input("Enter the PDF file path: ")
-        raw_text = extract_text_from_pdf(pdf_path)
-    elif choice == "3":
-        image_path = input("Enter the image file path: ")
-        raw_text = extract_text_from_image(image_path)
+@app.route('/simplify', methods=['POST'])
+def simplify():
+    data = request.get_json()
+    raw_text = data.get('text')
+    if raw_text:
+        simplified_text = simplify_content(raw_text)
+        return jsonify({'simplified_text': simplified_text})
+    return jsonify({'error': 'No text provided'}), 400
+
+@app.route('/extract_text', methods=['POST'])
+def extract_text():
+    data = request.get_json()
+    file_type = data.get('file_type')
+    file_path = data.get('file_path')
+
+    if file_type == "pdf":
+        text = extract_text_from_pdf(file_path)
+    elif file_type == "image":
+        text = extract_text_from_image(file_path)
     else:
-        print("Invalid choice. Exiting.")
-        return
+        return jsonify({'error': 'Invalid file type'}), 400
 
-    print("\nFetching related articles...")
-    articles = search_articles(raw_text)
+    return jsonify({'extracted_text': text})
 
-    print("Fetching related YouTube videos...")
-    videos = search_youtube_videos(raw_text)
+@app.route('/search_articles', methods=['POST'])
+def search_for_articles():
+    data = request.get_json()
+    query = data.get('query')
+    if query:
+        articles = search_articles(query)
+        return jsonify({'articles': articles})
+    return jsonify({'error': 'No query provided'}), 400
 
-    print("Simplifying the explanation...")
-    simplified_text = simplify_content(raw_text)
+@app.route('/search_youtube', methods=['POST'])
+def search_for_videos():
+    data = request.get_json()
+    query = data.get('query')
+    if query:
+        videos = search_youtube_videos(query)
+        return jsonify({'videos': videos})
+    return jsonify({'error': 'No query provided'}), 400
 
-    print("\n=== Simplified Explanation ===")
-    print(simplified_text)
-
-    print("\n=== Related Articles ===")
-    if isinstance(articles, list):
-        for idx, article in enumerate(articles[:5], start=1):  # Limit to top 5 articles
-            print(f"{idx}. {article['title']} ({article['link']}) - {article['snippet']}")
-    else:
-        print(articles)
-
-    print("\n=== Related YouTube Videos (with relevance) ===")
-    if isinstance(videos, list):
-        for idx, video in enumerate(videos, start=1):
-            relevance = calculate_relevance(raw_text, f"{video['title']} {video['description']}")
-            print(f"{idx}. {video['title']} ({video['link']}) - Relevance: {relevance}")
-    else:
-        print(videos)
+@app.route('/calculate_relevance', methods=['POST'])
+def calculate_video_relevance():
+    data = request.get_json()
+    topic = data.get('topic')
+    text = data.get('text')
+    if topic and text:
+        relevance = calculate_relevance(topic, text)
+        return jsonify({'relevance': relevance})
+    return jsonify({'error': 'Topic or text not provided'}), 400
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
+
