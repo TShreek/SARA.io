@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Python Backend Project</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Welcome to My Python Backend Project</h1>
+    </header>
+    <main>
+        <section id="results">
+            <h2>Results</h2>
+            <div id="output"></div>
+        </section>
+        <section id="input">
+            <h2>Input</h2>
+            <form id="dataForm">
+                <input type="text" id="userInput" placeholder="Enter your query" required>
+                <button type="submit">Submit</button>
+            </form>
+        </section>
+    </main>
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+</body>
+</html>
