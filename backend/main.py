@@ -1,14 +1,34 @@
+#make sure you've done 
+# pip install flask 
+# pip install google-api-python-client
+
 import requests
 import openai
 # do pip install openai requests
 
 # === CONFIGURATION ===
+import requests
+import openai
+from googleapiclient.discovery import build
+from flask import Flask, request, jsonify
+
+# === CONFIGURATION ===
+import requests
+import openai
+from googleapiclient.discovery import build
+from flask import Flask, request, jsonify
+
+# === CONFIGURATION ===
 OPENAI_API_KEY = "sk-proj-Tr4v5n-.......-rdx0v5-...."  # Replace with your OpenAI API key
 GOOGLE_API_KEY = "AIzaSyA....."  # Replace with your Google Custom Search API key
-GOOGLE_CSE_ID = "AIzaSyC5H....."    # Replace with your Custom Search Engine ID
+GOOGLE_CSE_ID = "R42l-32....gAt4"  # Replace with your Custom Search Engine ID
+YOUTUBE_API_KEY = "AIzaSyA....."  # Replace with your YouTube API key
 
 # Set up OpenAI API
 openai.api_key = OPENAI_API_KEY
+
+# Initialize Flask app
+app = Flask(__name__)
 
 def simplify_content(raw_text):
     """
@@ -50,34 +70,61 @@ def search_articles(query):
     except Exception as e:
         return f"Error fetching articles: {e}"
 
-def main():
-    print("Welcome to the Topic Simplifier!")
-    topic = input("Enter a topic: ")
+def search_youtube_videos(query):
+    """
+    Search for YouTube videos using the YouTube Data API.
+    """
+    try:
+        youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+        request = youtube.search().list(q=query, part="snippet", maxResults=5)
+        response = request.execute()
 
-    # Step 1: Fetch raw articles using Google Custom Search
-    print("Fetching related articles...")
-    articles = search_articles(topic)
+        # Extract video titles and links
+        results = []
+        for item in response.get("items", []):
+            title = item["snippet"]["title"]
+            video_id = item["id"]["videoId"]
+            link = f"https://www.youtube.com/watch?v={video_id}"
+            results.append({"title": title, "link": link})
 
-    # Step 2: Combine article snippets (or use Wikipedia for explanation)
-    if isinstance(articles, list) and len(articles) > 0:
-        raw_text = " ".join([article["title"] for article in articles])
-    else:
-        raw_text = "Unable to fetch related articles."
+        return results
+    except Exception as e:
+        return f"Error fetching YouTube videos: {e}"
 
-    # Step 3: Simplify the content using OpenAI's GPT
-    print("Simplifying the explanation...")
-    simplified_text = simplify_content(raw_text)
+@app.route('/simplify', methods=['POST'])
+def simplify():
+    """
+    API endpoint that receives a topic, fetches related articles, YouTube videos, 
+    and returns simplified explanation, article links, and video links.
+    """
+    try:
+        # Get topic from POST request
+        topic = request.json.get('topic')
 
-    # Output the results
-    print("\n=== Simplified Explanation ===")
-    print(simplified_text)
+        # Step 1: Fetch raw articles using Google Custom Search
+        articles = search_articles(topic)
 
-    print("\n=== Related Articles ===")
-    if isinstance(articles, list):
-        for idx, article in enumerate(articles[:5], start=1):  # Limit to top 5 articles
-            print(f"{idx}. {article['title']} ({article['link']})")
-    else:
-        print(articles)
+        # Step 2: Fetch related YouTube videos
+        youtube_videos = search_youtube_videos(topic)
+
+        # Step 3: Combine article snippets (or use Wikipedia for explanation)
+        if isinstance(articles, list) and len(articles) > 0:
+            raw_text = " ".join([article["title"] for article in articles])
+        else:
+            raw_text = "Unable to fetch related articles."
+
+        # Step 4: Simplify the content using OpenAI's GPT
+        simplified_text = simplify_content(raw_text)
+
+        # Return the simplified text, article links, and YouTube video links as JSON
+        return jsonify({
+            "simplified_text": simplified_text,
+            "articles": articles[:5],  # Limit to top 5 articles
+            "youtube_videos": youtube_videos[:5]  # Limit to top 5 YouTube videos
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
+
